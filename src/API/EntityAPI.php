@@ -23,9 +23,11 @@ class EntityAPI{
 	private $server;
 	private $entities;
 	private $eCnt = 1;
+	private $dropEntities;
 
 	function __construct(){
 		$this->entities = array();
+		$this->dropEntities = array();
 		$this->server = ServerAPI::request();
 	}
 
@@ -38,6 +40,50 @@ class EntityAPI{
 	
 	public function init(){
 		$this->server->schedule(25, array($this, "updateEntities"), array(), true);
+		
+		$this->server->schedule(1, array($this, "updateEntitiesDrop"), array(), true);
+		$this->server->addHandler("entity.add", array($this, "handler"), 1);
+	}
+	
+	/**
+	 * @param Entity $data
+	 * @param string $event
+	 *
+	 * @return boolean
+	 */
+	public function handler($data, $event) {
+		switch($event) {
+			case "entity.add":
+				if ($data->class == ENTITY_ITEM) {
+					$this->dropEntities["EntityItem:" + $data->eid] = $data;
+				}
+				
+				return true;
+		}
+	}
+	
+	public function updateEntitiesDrop() {
+		foreach ($this->dropEntities as $key => $entity) {
+			if ($entity instanceof Entity) {
+				$x = $entity->x;
+				$y = $entity->y;
+				$z = $entity->z;
+				
+				$touching = false;
+				
+				$block = new Vector3((int) $x, ((int) $y) - 1, (int) $z);
+				
+				if ($entity->touchingBlock($block)) {
+					$touching = true;
+				}
+				
+				if ($touching == false) {
+					$entity->move(new Vector3(0, -0.1, 0));
+				} else {
+					unset($this->dropEntities[$key]);
+				}
+			}
+		}
 	}
 	
 	public function updateEntities(){
